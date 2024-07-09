@@ -201,7 +201,12 @@ public class CarController : MonoBehaviour
 
     private void OnCollisionEnter(Collision other)
     {
-        if (other.gameObject.CompareTag("Obstacle"))
+        if (other.gameObject.CompareTag("Obstacle") || other.gameObject.CompareTag("Car"))
+        {
+            canMove = false;
+        }
+
+        if (other.gameObject.CompareTag($"Exit"))
         {
             Destroy(gameObject);
         }

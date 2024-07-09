@@ -7,6 +7,7 @@ TagManager:
   - Obstacle
   - Car
   - Waypoint
+  - Exit
   layers:
   - Default
   - TransparentFX
