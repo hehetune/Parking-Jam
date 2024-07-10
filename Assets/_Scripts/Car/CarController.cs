@@ -17,12 +17,10 @@ public class CarController : MonoBehaviour
 {
     private Rigidbody rb;
 
-    [Header("Interact")]
-    private Vector2 _firstTouchPosition;
+    [Header("Interact")] private Vector2 _firstTouchPosition;
     private Vector2 _finalTouchPosition;
-    
-    [Header("Swipe")]
-    public float swipeAngle;
+
+    [Header("Swipe")] public float swipeAngle;
     public float swipeResist = .5f;
 
     [SerializeField] private int carDirection = 0;
@@ -31,6 +29,7 @@ public class CarController : MonoBehaviour
 
     [SerializeField] private bool isMovingForward = true;
     [SerializeField] private bool canMove = false;
+
     [SerializeField] private Vector3 moveDirection = Vector3.zero;
     public float targetX;
     public float targetZ;
@@ -43,7 +42,7 @@ public class CarController : MonoBehaviour
     private bool cacheTurnDirection;
 
     private Coroutine waitToMoveCoroutine;
-    
+
     private float TurnDistance = 0.1f;
 
     private static readonly Dictionary<(int, Direction), bool> MovementLogic = new()
@@ -61,6 +60,7 @@ public class CarController : MonoBehaviour
     private void Awake()
     {
         rb = GetComponent<Rigidbody>();
+        rb.isKinematic = true;
         GetCarDirection();
         isFollowXAxis = carDirection == 1 || carDirection == 3;
     }
@@ -86,8 +86,20 @@ public class CarController : MonoBehaviour
         }
     }
 
+    private float backwardTime = 0.1f;
+    private float backwardTimer = 0f;
+
     private void Update()
     {
+        if (backwardTimer > 0f)
+        {
+            backwardTimer -= Time.deltaTime;
+            rb.velocity = -1 * moveDirection;
+        
+            if (backwardTimer <= 0) rb.isKinematic = true; 
+            return;
+        }
+
         if (!canMove)
         {
             if (rb.velocity != Vector3.zero) rb.velocity = Vector3.zero;
@@ -100,13 +112,14 @@ public class CarController : MonoBehaviour
             if (Mathf.Abs(distance) <= TurnDistance)
             {
                 curWaypoint.SetCarMovementAxis(this);
-                // moveDirection.x = isFollowXAxis ? targetX : 0f;
-                // moveDirection.z = isFollowXAxis ? 0f : targetZ;
 
                 StartCoroutine(PerformTurn(isMovingForward ? cacheTurnDirection : !cacheTurnDirection));
             }
         }
+    }
 
+    private void RefreshVelocity()
+    {
         Vector3 dir = moveDirection * moveSpeed;
         rb.velocity = new Vector3(dir.x, rb.velocity.y, dir.z);
     }
@@ -120,6 +133,7 @@ public class CarController : MonoBehaviour
 
         this.targetX = targetX;
         this.targetZ = targetZ;
+        RefreshVelocity();
     }
 
     public void Turn(bool turnRight)
@@ -173,8 +187,10 @@ public class CarController : MonoBehaviour
 
         if (MovementLogic.TryGetValue((carDirection, direction), out var moveForward))
         {
+            rb.isKinematic = false;
             isMovingForward = moveForward;
             moveDirection = isMovingForward ? transform.forward : -transform.forward;
+            RefreshVelocity();
             canMove = true;
         }
     }
@@ -217,14 +233,23 @@ public class CarController : MonoBehaviour
 
     private void OnCollisionEnter(Collision other)
     {
-        if (other.gameObject.CompareTag("Obstacle") || other.gameObject.CompareTag("Car"))
+        switch (other.gameObject.tag)
         {
-            canMove = false;
-        }
-
-        if (other.gameObject.CompareTag($"Exit"))
-        {
-            Destroy(gameObject);
+            case "Obstacle":
+                backwardTimer = backwardTime;
+                canMove = false;
+                break;
+            case "Car":
+                if (!readyToGo && canMove)
+                {
+                    Debug.Log("collide car");
+                    backwardTimer = backwardTime;
+                    canMove = false;
+                }
+                break;
+            case "Exit":
+                Destroy(gameObject);
+                break;
         }
     }
 
