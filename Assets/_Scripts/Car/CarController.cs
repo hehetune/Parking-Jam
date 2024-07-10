@@ -32,7 +32,9 @@ public class CarController : MonoBehaviour
     [SerializeField] private bool isMovingForward = true;
     [SerializeField] private bool canMove = false;
     [SerializeField] private Vector3 moveDirection = Vector3.zero;
-    public Vector3 targetPosition;
+    public float targetX;
+    public float targetZ;
+    public bool isFollowXAxis;
     public bool aimToTarget = false;
 
     private Waypoint curWaypoint;
@@ -41,6 +43,8 @@ public class CarController : MonoBehaviour
     private bool cacheTurnDirection;
 
     private Coroutine waitToMoveCoroutine;
+    
+    private float TurnDistance = 0.1f;
 
     private static readonly Dictionary<(int, Direction), bool> MovementLogic = new()
     {
@@ -58,6 +62,7 @@ public class CarController : MonoBehaviour
     {
         rb = GetComponent<Rigidbody>();
         GetCarDirection();
+        isFollowXAxis = carDirection == 1 || carDirection == 3;
     }
 
     private void GetCarDirection()
@@ -91,12 +96,12 @@ public class CarController : MonoBehaviour
 
         if (aimToTarget)
         {
-            Vector3 curPos = new Vector3(transform.position.x, 0, transform.position.z);
-            if (Vector3.Distance(curPos, targetPosition) <= 0.1f)
+            float distance = isFollowXAxis ? (transform.position.x - targetX) : (transform.position.z - targetZ);
+            if (Mathf.Abs(distance) <= TurnDistance)
             {
-                targetPosition = curWaypoint.GetCarTargetPosition(this);
-                Vector3 dirToTarget = targetPosition - curPos;
-                moveDirection = new Vector3(dirToTarget.x, moveDirection.y, dirToTarget.z).normalized;
+                curWaypoint.SetCarMovementAxis(this);
+                // moveDirection.x = isFollowXAxis ? targetX : 0f;
+                // moveDirection.z = isFollowXAxis ? 0f : targetZ;
 
                 StartCoroutine(PerformTurn(isMovingForward ? cacheTurnDirection : !cacheTurnDirection));
             }
@@ -104,6 +109,17 @@ public class CarController : MonoBehaviour
 
         Vector3 dir = moveDirection * moveSpeed;
         rb.velocity = new Vector3(dir.x, rb.velocity.y, dir.z);
+    }
+
+    public void FollowXAxis(bool follow, float multiply, float targetX = 0, float targetZ = 0)
+    {
+        Debug.Log("FollowXAxis " + follow + " " + multiply);
+        isFollowXAxis = follow;
+        moveDirection.x = follow ? multiply : 0;
+        moveDirection.z = follow ? 0 : multiply;
+
+        this.targetX = targetX;
+        this.targetZ = targetZ;
     }
 
     public void Turn(bool turnRight)
@@ -216,6 +232,7 @@ public class CarController : MonoBehaviour
     {
         if (other.gameObject.CompareTag("Waypoint"))
         {
+            Debug.Log("Enter waypoint");
             curWaypoint = other.GetComponent<Waypoint>();
             curWaypoint.CarEnter(this);
         }
@@ -223,6 +240,7 @@ public class CarController : MonoBehaviour
 
     private void OnTriggerExit(Collider other)
     {
+        Debug.Log("Exit waypoint");
         if (other.gameObject.CompareTag("Waypoint"))
         {
             Waypoint wp = other.GetComponent<Waypoint>();
